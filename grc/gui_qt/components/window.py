@@ -890,10 +890,11 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
         else:
             dirname = os.getcwd()
         Open = QtWidgets.QFileDialog.getOpenFileName
+        # Despite qtpy, PyQt5 and PySide2 have different signatures for getOpenFileName
         filename, filtr = Open(
-            self,
-            self.actions["open"].statusTip(),
-            dir=dirname,
+            self,  # parent
+            self.actions["open"].statusTip(),  # caption
+            dirname,  # dir
             filter="Flow Graph Files (*.grc);;All files (*.*)",
         )
         return filename
@@ -1105,7 +1106,7 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
             self.app.VariableEditor.set_scene(self.currentFlowgraphScene)
         self.updateActions()
 
-    def close_triggered(self, tab_index=None) -> Union[str, bool]:
+    def close_triggered(self, tab_index=False) -> Union[str, bool]:
         """
         Closes a tab.
 
@@ -1118,7 +1119,7 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
         log.debug(f"Closing a tab (index {tab_index})")
 
         file_path = self.currentFlowgraphScene.filename
-        if tab_index is None:
+        if tab_index == False:
             tab_index = self.tabWidget.currentIndex()
 
         if self.currentFlowgraphScene.saved:
@@ -1341,7 +1342,7 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
     def properties_triggered(self):
         log.debug("properties")
         if len(self.currentFlowgraphScene.selected_blocks()) != 1:
-            log.warn("Opening Properties even though selected_blocks() != 1 ")
+            log.warning("Opening Properties even though selected_blocks() != 1 ")
         self.currentFlowgraphScene.selected_blocks()[0].open_properties()
 
     def enable_triggered(self):
@@ -1397,7 +1398,7 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
     def block_dec_type_triggered(self):
         log.debug("block_dec_type")
 
-    def generate_triggered(self):
+    def generate_triggered(self, called_from_exec=False):
         log.debug("generate")
         if not self.currentFlowgraphScene.saved:
             self.save_triggered()
@@ -1410,14 +1411,14 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
         generator = self.platform.Generator(
             self.currentFlowgraph, os.path.dirname(filename)
         )
-        generator.write()
+        generator.write(called_from_exec)
         self.currentView.generator = generator
         log.info(f"Generated {generator.file_path}")
 
     def execute_triggered(self):
         log.debug("execute")
         if self.currentView.process_is_done():
-            self.generate_triggered()
+            self.generate_triggered(called_from_exec=True)
             if self.currentView.generator:
                 xterm = self.app.qsettings.value("grc/xterm_executable", "")
                 '''if self.config.xterm_missing() != xterm:
@@ -1431,7 +1432,7 @@ class MainWindow(QtWidgets.QMainWindow, base.Component):
                         view=self.currentView,
                         flowgraph=self.currentFlowgraph,
                         xterm_executable=xterm,
-                        callback=self.updateActions
+                        update_gui_callback=self.updateActions
                     )
 
     def kill_triggered(self):
